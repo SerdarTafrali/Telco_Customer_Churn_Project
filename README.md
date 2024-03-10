@@ -1,6 +1,6 @@
 # Telco Customer Churn Prediction
 
-![image](/images/Telco_Customer_Churn_prediction.jpg)
+![image](/image/Telco_Customer_Churn_prediction.jpg)
 
 ## Project Overview
 This project aims to develop a machine learning model capable of predicting which customers are likely to churn from a fictional telecom company. Prior to model development, it's essential to perform data analysis and feature engineering steps to prepare the data adequately.

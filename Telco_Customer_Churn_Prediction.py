@@ -1,3 +1,40 @@
+# Importing
+##################################
+
+import warnings
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
+from pandas import DataFrame
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, cross_validate
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier
+
+warnings.simplefilter(action="ignore")
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', 170)
+pd.set_option('display.max_rows', None)
+pd.set_option('display.float_format', lambda x: '%.3f' % x)
+
+df = pd.read_csv(r"C:\Users\SERDAR\Documents\Mentorluk\DSMLBC14\Telco-Customer-Churn\Telco-Customer-Churn.csv")
+df.head()
+df.shape
+df.info()
+
+# TotalCharges sayısal bir değişken olmalı
+df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors='coerce')
+
+df["Churn"] = df["Churn"].apply(lambda x: 1 if x == "Yes" else 0)
+
+
 ##################################
 # TASK 1: EXPLORATORY DATA ANALYSIS
 ##################################
@@ -20,6 +57,7 @@ def check_df(dataframe, head=5):
     print(dataframe.isnull().sum())  # Summarizes missing values
     print("##################### Quantiles #####################")
     print(dataframe.quantile([0, 0.05, 0.50, 0.95, 0.99, 1]).T)  # Displays quantile statistics
+
 
 check_df(df)  # Execute the function to display the dataset overview.
 
@@ -44,8 +82,10 @@ def grab_col_names(dataframe, cat_th=10, car_th=20):
     cat_but_car: List of cardinal (categorical but with many unique values) variable names.
     """
     cat_cols = [col for col in dataframe.columns if dataframe[col].dtype == "O"]  # Categorical columns
-    num_but_cat = [col for col in dataframe.columns if dataframe[col].nunique() < cat_th and dataframe[col].dtype != "O"]  # Numeric but categorical
-    cat_but_car = [col for col in dataframe.columns if dataframe[col].nunique() > car_th and dataframe[col].dtype == "O"]  # Categorical but cardinal
+    num_but_cat = [col for col in dataframe.columns if
+                   dataframe[col].nunique() < cat_th and dataframe[col].dtype != "O"]  # Numeric but categorical
+    cat_but_car = [col for col in dataframe.columns if
+                   dataframe[col].nunique() > car_th and dataframe[col].dtype == "O"]  # Categorical but cardinal
     cat_cols += num_but_cat  # Combine categorical columns
     cat_cols = [col for col in cat_cols if col not in cat_but_car]  # Exclude cardinal columns from categorical columns
 
@@ -60,6 +100,7 @@ def grab_col_names(dataframe, cat_th=10, car_th=20):
     print(f'num_but_cat: {len(num_but_cat)}')
 
     return cat_cols, num_cols, cat_but_car
+
 
 # Execute the function to identify and separate variable types.
 cat_cols, num_cols, cat_but_car = grab_col_names(df)
@@ -76,6 +117,7 @@ def cat_summary(dataframe, col_name, plot=False):
     if plot:
         sns.countplot(x=dataframe[col_name], data=dataframe)
         plt.show()
+
 
 # Loop through categorical columns to summarize them.
 for col in cat_cols:
@@ -96,6 +138,7 @@ def num_summary(dataframe, numerical_col, plot=False):
         plt.title(numerical_col)
         plt.show()
 
+
 # Loop through numerical columns to summarize and plot them.
 for col in num_cols:
     num_summary(df, col, plot=True)
@@ -107,6 +150,7 @@ for col in num_cols:
 # Function to compare the means of numerical columns by the target variable.
 def target_summary_with_num(dataframe, target, numerical_col):
     print(dataframe.groupby(target).agg({numerical_col: "mean"}), end="\n\n\n")
+
 
 # Execute the function for each numerical column.
 for col in num_cols:
@@ -123,10 +167,10 @@ def target_summary_with_cat(dataframe, target, categorical_col):
                         "Count": dataframe[categorical_col].value_counts(),
                         "Ratio": 100 * dataframe[categorical_col].value_counts() / len(dataframe)}), end="\n\n\n")
 
+
 # Execute the function for each categorical column.
 for col in cat_cols:
     target_summary_with_cat(df, "Churn", col)
-
 
 # CORRELATION ANALYSIS
 ##################################
@@ -153,6 +197,7 @@ df.corrwith(df["Churn"]).sort_values(ascending=False)
 # Check for any missing values in the dataset.
 df.isnull().sum()
 
+
 # Function to create a summary table of missing values in the dataframe.
 def missing_values_table(dataframe, na_name=False):
     # Identify columns with missing values.
@@ -167,6 +212,7 @@ def missing_values_table(dataframe, na_name=False):
     if na_name:
         return na_columns
 
+
 # Execute the function to display the missing values table.
 na_columns = missing_values_table(df, na_name=True)
 
@@ -176,7 +222,6 @@ df["TotalCharges"].fillna(df["TotalCharges"].median(), inplace=True)
 # Verify if missing values have been addressed.
 df.isnull().sum()
 
-
 # BASE MODEL SETUP
 ##################################
 
@@ -185,11 +230,13 @@ dff = df.copy()
 # Exclude the target variable 'Churn' from the list of categorical columns.
 cat_cols = [col for col in cat_cols if col not in ["Churn"]]
 
+
 # Function to apply one-hot encoding to categorical variables.
 def one_hot_encoder(dataframe, categorical_cols, drop_first=False):
     # Convert categorical variable into dummy/indicator variables.
     dataframe = pd.get_dummies(dataframe, columns=categorical_cols, drop_first=drop_first)
     return dataframe
+
 
 # Apply one-hot encoding to the dataframe.
 dff = one_hot_encoder(dff, cat_cols, drop_first=True)
@@ -231,6 +278,7 @@ def outlier_thresholds(dataframe, col_name, q1=0.05, q3=0.95):
     low_limit = quartile1 - 1.5 * interquantile_range
     return low_limit, up_limit
 
+
 # Function to check for outliers in a column.
 def check_outlier(dataframe, col_name):
     low_limit, up_limit = outlier_thresholds(dataframe, col_name)
@@ -239,11 +287,13 @@ def check_outlier(dataframe, col_name):
     else:
         return False
 
+
 # Function to replace outliers with the thresholds.
-def replace_with_thresholds(dataframe, variable, q1=0.05, q3=0.95):
+def replace_with_thresholds(dataframe, variable):
     low_limit, up_limit = outlier_thresholds(dataframe, variable, q1=0.05, q3=0.95)
     dataframe.loc[(dataframe[variable] < low_limit), variable] = low_limit
     dataframe.loc[(dataframe[variable] > up_limit), variable] = up_limit
+
 
 # Analyze and handle outliers for numerical columns.
 for col in num_cols:
@@ -255,7 +305,8 @@ for col in num_cols:
 # FEATURE EXTRACTION
 ##################################
 
-# Creating yearly categorical variables from the 'tenure' feature to understand customer loyalty in terms of year ranges.
+# Creating yearly categorical variables from the 'tenure' feature
+# to understand customer loyalty in terms of year ranges.
 df.loc[(df["tenure"] >= 0) & (df["tenure"] <= 12), "NEW_TENURE_YEAR"] = "0-1 Year"
 df.loc[(df["tenure"] > 12) & (df["tenure"] <= 24), "NEW_TENURE_YEAR"] = "1-2 Year"
 df.loc[(df["tenure"] > 24) & (df["tenure"] <= 36), "NEW_TENURE_YEAR"] = "2-3 Year"
@@ -267,19 +318,24 @@ df.loc[(df["tenure"] > 60) & (df["tenure"] <= 72), "NEW_TENURE_YEAR"] = "5-6 Yea
 df["NEW_Engaged"] = df["Contract"].apply(lambda x: 1 if x in ["One year", "Two year"] else 0)
 
 # Identifying customers who do not have any of the support, backup, or protection services.
-df["NEW_noProt"] = df.apply(lambda x: 1 if (x["OnlineBackup"] != "Yes") or (x["DeviceProtection"] != "Yes") or (x["TechSupport"] != "Yes") else 0, axis=1)
+df["NEW_noProt"] = df.apply(lambda x: 1 if (x["OnlineBackup"] != "Yes") or (x["DeviceProtection"] != "Yes") or (
+        x["TechSupport"] != "Yes") else 0, axis=1)
 
 # Identifying young, not engaged (monthly contracts) customers potentially at higher risk of churning.
-df["NEW_Young_Not_Engaged"] = df.apply(lambda x: 1 if (x["NEW_Engaged"] == 0) and (x["SeniorCitizen"] == 0) else 0, axis=1)
+df["NEW_Young_Not_Engaged"] = df.apply(lambda x: 1 if (x["NEW_Engaged"] == 0) and (x["SeniorCitizen"] == 0) else 0,
+                                       axis=1)
 
 # Counting the total number of services each customer has subscribed to.
-df['NEW_TotalServices'] = (df[['PhoneService', 'InternetService', 'OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies']] == 'Yes').sum(axis=1)
+df['NEW_TotalServices'] = (df[['PhoneService', 'InternetService', 'OnlineSecurity', 'OnlineBackup', 'DeviceProtection',
+                               'TechSupport', 'StreamingTV', 'StreamingMovies']] == 'Yes').sum(axis=1)
 
 # Identifying customers who have subscribed to any streaming service.
-df["NEW_FLAG_ANY_STREAMING"] = df.apply(lambda x: 1 if (x["StreamingTV"] == "Yes") or (x["StreamingMovies"] == "Yes") else 0, axis=1)
+df["NEW_FLAG_ANY_STREAMING"] = df.apply(
+    lambda x: 1 if (x["StreamingTV"] == "Yes") or (x["StreamingMovies"] == "Yes") else 0, axis=1)
 
 # Marking customers who use automatic payment methods.
-df["NEW_FLAG_AutoPayment"] = df["PaymentMethod"].apply(lambda x: 1 if x in ["Bank transfer (automatic)", "Credit card (automatic)"] else 0)
+df["NEW_FLAG_AutoPayment"] = df["PaymentMethod"].apply(
+    lambda x: 1 if x in ["Bank transfer (automatic)", "Credit card (automatic)"] else 0)
 
 # Calculating the average monthly charges.
 df["NEW_AVG_Charges"] = df["TotalCharges"] / (df["tenure"] + 1)
@@ -301,11 +357,13 @@ df.shape
 # Separating variable types for encoding.
 cat_cols, num_cols, cat_but_car = grab_col_names(df)
 
+
 # LABEL ENCODING: Transforming binary categorical variables into a machine-readable format.
 def label_encoder(dataframe, binary_col):
     labelencoder = LabelEncoder()
     dataframe[binary_col] = labelencoder.fit_transform(dataframe[binary_col])
     return dataframe
+
 
 # Identifying binary categorical columns for label encoding.
 binary_cols = [col for col in df.columns if df[col].dtypes == "O" and df[col].nunique() == 2]
@@ -318,17 +376,18 @@ for col in binary_cols:
 # Updating the list of categorical columns excluding the binary ones and the target variable 'Churn'.
 cat_cols = [col for col in cat_cols if col not in binary_cols and col not in ["Churn", "NEW_TotalServices"]]
 
+
 # Function to apply one-hot encoding to the specified categorical columns.
 def one_hot_encoder(dataframe, categorical_cols, drop_first=False):
     dataframe = pd.get_dummies(dataframe, columns=categorical_cols, drop_first=drop_first)
     return dataframe
 
+
 # Applying one-hot encoding to the dataframe.
-df = one_hot_encoder(df, cat_cols, drop_first=True)
+df: DataFrame = one_hot_encoder(df, cat_cols, drop_first=True)
 
 # Viewing the head of the dataframe after encoding.
 df.head()
-
 ##################################
 # MODELING
 ##################################
@@ -383,7 +442,7 @@ print(rf_best_grid.best_params_)
 print(rf_best_grid.best_score_)
 
 # Train the final model with the best parameters.
-rf_final = rf_model.set_params(**rf_best_grid.best_params_, random_state=17).fit(X, y)
+rf_final: object = rf_model.set_params(**rf_best_grid.best_params_, random_state=17).fit(X, y)
 
 # Evaluate the final model using cross-validation.
 cv_results = cross_validate(rf_final, X, y, cv=10, scoring=["accuracy", "f1", "roc_auc"])
@@ -472,6 +531,7 @@ print(f"CatBoost Accuracy: {cv_results['test_accuracy'].mean()}")
 print(f"CatBoost F1 Score: {cv_results['test_f1'].mean()}")
 print(f"CatBoost ROC AUC: {cv_results['test_roc_auc'].mean()}")
 
+
 ################################################
 # Feature Importance Analysis
 ################################################
@@ -489,6 +549,7 @@ def plot_importance(model, features, num=len(X), save=False):
     # Optionally save the plot.
     if save:
         plt.savefig('importances.png')
+
 
 # Plot feature importance for all final models to understand which features are most influential in predicting churn.
 plot_importance(rf_final, X)
